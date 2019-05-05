@@ -1,19 +1,26 @@
 use core::mem;
 use std::fmt::Error;
 
-pub type Byte = u8;
+pub type PseudoByte = u32;
 
-/// Converts a string to a list of bits
 /// ```
 /// let result = stegno::bits::bitify_message("A");
 /// assert_eq!(result, vec![0, 1, 0, 0, 0, 0, 0, 1]);
+///
+/// let result = stegno::bits::bitify_message("Avshyz");
+/// assert_eq!(result, vec![0, 1, 0, 0, 0, 0, 0, 1,
+///                         0, 1, 1, 1, 0, 1, 1, 0,
+///                         0, 1, 1, 1, 0, 0, 1, 1,
+///                         0, 1, 1, 0, 1, 0, 0, 0,
+///                         0, 1, 1, 1, 1, 0, 0, 1,
+///                         0, 1, 1, 1, 1, 0, 1, 0]);
 /// ```
-pub fn bitify_message(cipher: &str) -> Vec<Byte> {
+pub fn bitify_message(cipher: &str) -> Vec<PseudoByte> {
     let mut res = vec![];
     for char in cipher.as_bytes() {
-        let curr: Vec<Byte> = (0..mem::size_of_val(&char) * 8)
+        let curr: Vec<PseudoByte> = (0..mem::size_of_val(&char))
             .rev()
-            .map(|i| get_bit_at(*char, i).unwrap())
+            .map(|i| get_bit_at(*char as u32, i).unwrap())
             .collect();
         res.extend(curr);
     }
@@ -26,7 +33,7 @@ pub fn bitify_message(cipher: &str) -> Vec<Byte> {
 /// assert_eq!(stegno::bits::get_bit_at(7, 2).unwrap(), 1);
 /// assert_eq!(stegno::bits::get_bit_at(7, 3).unwrap(), 0);
 /// ```
-pub fn get_bit_at(input: Byte, n: usize) -> Result<Byte, String> {
+pub fn get_bit_at(input: PseudoByte, n: usize) -> Result<PseudoByte, String> {
     if n < mem::size_of_val(&input) * 8 {
         Ok((input & (1 << n)) >> n)
     } else {
@@ -44,12 +51,12 @@ pub fn get_bit_at(input: Byte, n: usize) -> Result<Byte, String> {
 ///
 /// assert_eq!(stegno::bits::set_bit_at(255, 0, 0).unwrap(), 254);
 /// ```
-pub fn set_bit_at(input: Byte, n: usize, val: Byte) -> Result<Byte, String> {
+pub fn set_bit_at(input: PseudoByte, n: usize, val: PseudoByte) -> Result<PseudoByte, String> {
     if n < mem::size_of_val(&input) * 8 {
         if val == 1 {
-            Ok(input | (1 as Byte).rotate_left(n as u32))
+            Ok(input | (1 as PseudoByte).rotate_left(n as u32))
         } else {
-            Ok(input & (!1 as Byte).rotate_left(n as u32))
+            Ok(input & (!1 as PseudoByte).rotate_left(n as u32))
         }
     } else {
         Err(String::from("Accessing bit that doesn't exist"))

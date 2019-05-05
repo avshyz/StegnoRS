@@ -1,7 +1,7 @@
 use std::any::Any;
 use core::mem;
 
-type Byte = u8;
+pub type Byte = u8;
 
 /// Converts a string to a list of bits
 /// ```

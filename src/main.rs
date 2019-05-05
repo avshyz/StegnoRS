@@ -1,7 +1,5 @@
-use std::any::Any;
 use stegno::bits as bits;
+use stegno::files as files;
 
 fn main() {
-
-    println!("{:?}", bits::bitify_message("Avshyz"));
 }

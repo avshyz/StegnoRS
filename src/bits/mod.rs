@@ -1,26 +1,28 @@
-use core::mem;
-use std::fmt::Error;
+#![feature(trait_alias)]
+extern crate num;
 
-pub type PseudoByte = u32;
+use core::mem;
+use num::NumCast;
+use self::num::PrimInt;
 
 /// ```
 /// let result = stegno::bits::bitify_message("A");
-/// assert_eq!(result, vec![0, 1, 0, 0, 0, 0, 0, 1]);
+/// assert_eq!(result, vec![false, true, false, false, false, false, false, true]);
 ///
 /// let result = stegno::bits::bitify_message("Avshyz");
-/// assert_eq!(result, vec![0, 1, 0, 0, 0, 0, 0, 1,
-///                         0, 1, 1, 1, 0, 1, 1, 0,
-///                         0, 1, 1, 1, 0, 0, 1, 1,
-///                         0, 1, 1, 0, 1, 0, 0, 0,
-///                         0, 1, 1, 1, 1, 0, 0, 1,
-///                         0, 1, 1, 1, 1, 0, 1, 0]);
+/// assert_eq!(result, vec![false, true, false, false, false, false, false, true,
+///                         false, true, true, true, false, true, true, false,
+///                         false, true, true, true, false, false, true, true,
+///                         false, true, true, false, true, false, false, false,
+///                         false, true, true, true, true, false, false, true,
+///                         false, true, true, true, true, false, true, false]);
 /// ```
-pub fn bitify_message(cipher: &str) -> Vec<PseudoByte> {
+pub fn bitify_message(cipher: &str) -> Vec<bool> {
     let mut res = vec![];
     for char in cipher.as_bytes() {
-        let curr: Vec<PseudoByte> = (0..mem::size_of_val(&char))
+        let curr: Vec<bool> = (0..mem::size_of_val(&char))
             .rev()
-            .map(|i| get_bit_at(*char as u32, i).unwrap())
+            .map(|i| get_bit_at(*char, i as u32).unwrap())
             .collect();
         res.extend(curr);
     }
@@ -28,14 +30,15 @@ pub fn bitify_message(cipher: &str) -> Vec<PseudoByte> {
 }
 
 /// ```
-/// assert_eq!(stegno::bits::get_bit_at(7, 0).unwrap(), 1);
-/// assert_eq!(stegno::bits::get_bit_at(7, 1).unwrap(), 1);
-/// assert_eq!(stegno::bits::get_bit_at(7, 2).unwrap(), 1);
-/// assert_eq!(stegno::bits::get_bit_at(7, 3).unwrap(), 0);
+/// assert_eq!(stegno::bits::get_bit_at(7, 0).unwrap(), true);
+/// assert_eq!(stegno::bits::get_bit_at(7, 1).unwrap(), true);
+/// assert_eq!(stegno::bits::get_bit_at(7, 2).unwrap(), true);
+/// assert_eq!(stegno::bits::get_bit_at(7, 3).unwrap(), false);
 /// ```
-pub fn get_bit_at(input: PseudoByte, n: usize) -> Result<PseudoByte, String> {
-    if n < mem::size_of_val(&input) * 8 {
-        Ok((input & (1 << n)) >> n)
+pub fn get_bit_at<T: PrimInt>(input: T, n: u32) -> Result<bool, String> {
+    let mask = T::one() << NumCast::from(n).unwrap();
+    if (n as usize) < mem::size_of_val(&input) * 8 {
+        Ok(input & mask != T::zero())
     } else {
         Err(String::from("Accessing bit that doesn't exist"))
     }
@@ -43,20 +46,20 @@ pub fn get_bit_at(input: PseudoByte, n: usize) -> Result<PseudoByte, String> {
 
 
 /// ```
-/// assert_eq!(stegno::bits::set_bit_at(7, 0, 0).unwrap(), 6);
-/// assert_eq!(stegno::bits::set_bit_at(7, 1, 0).unwrap(), 5);
-/// assert_eq!(stegno::bits::set_bit_at(7, 2, 0).unwrap(), 3);
-/// assert_eq!(stegno::bits::set_bit_at(7, 2, 1).unwrap(), 7);
-/// assert_eq!(stegno::bits::set_bit_at(7, 3, 1).unwrap(), 15);
+/// assert_eq!(stegno::bits::set_bit_at(7, 0, false).unwrap(), 6);
+/// assert_eq!(stegno::bits::set_bit_at(7, 1, false).unwrap(), 5);
+/// assert_eq!(stegno::bits::set_bit_at(7, 2, false).unwrap(), 3);
+/// assert_eq!(stegno::bits::set_bit_at(7, 2, true).unwrap(), 7);
+/// assert_eq!(stegno::bits::set_bit_at(7, 3, true).unwrap(), 15);
 ///
-/// assert_eq!(stegno::bits::set_bit_at(255, 0, 0).unwrap(), 254);
+/// assert_eq!(stegno::bits::set_bit_at(255, 0, false).unwrap(), 254);
 /// ```
-pub fn set_bit_at(input: PseudoByte, n: usize, val: PseudoByte) -> Result<PseudoByte, String> {
-    if n < mem::size_of_val(&input) * 8 {
-        if val == 1 {
-            Ok(input | (1 as PseudoByte).rotate_left(n as u32))
+pub fn set_bit_at<T: PrimInt>(input: T, n: u32, val: bool) -> Result<T, String> {
+    if (n as usize) < mem::size_of_val(&input) * 8 {
+        if val {
+            Ok(input | T::one().rotate_left(n))
         } else {
-            Ok(input & (!1 as PseudoByte).rotate_left(n as u32))
+            Ok(input & !T::one().rotate_left(n))
         }
     } else {
         Err(String::from("Accessing bit that doesn't exist"))

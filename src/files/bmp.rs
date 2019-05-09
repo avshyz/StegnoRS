@@ -38,15 +38,11 @@ pub fn encrypt(img_data_bytes: &Vec<u8>, plain: &str) -> Result<Vec<u8>, String>
 
 pub fn decrypt(img_data_bytes: &Vec<u8>) -> Result<String, FromUtf8Error> {
     img_data_bytes.iter()
-        .map(|&byte| { byte % 2 == 1 })
+        .map(|&byte| byte % 2 == 1)
         .chunks(8)
         .into_iter()
         .map(|bits| unbitify_message(bits.collect_vec()))
-        .take_while(|byte| match &byte {
-            // TOTHINK - not sure if this is ugly or not.
-            Ok(r) => r != "\n",
-            Err(e) => false
-        })
+        .take_while(|byte| byte.as_ref().ok() != Some(&String::from("\n")))
         .collect()
 }
 

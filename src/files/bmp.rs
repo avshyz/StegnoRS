@@ -9,6 +9,7 @@ use crate::bits::{bitify_message, set_bit_at, unbitify_message};
 use self::itertools::{Itertools, EitherOrBoth, Chunk, Chunks};
 use std::string::FromUtf8Error;
 
+const EOF: &str = "\n";
 
 pub fn read(path: &str) -> Result<Vec<u8>, std::io::Error> {
     let mut f = File::open(path)?;
@@ -24,7 +25,7 @@ pub fn write(path: &str, data: &Vec<u8>) -> Result<(), std::io::Error> {
 }
 
 pub fn encrypt(img_data_bytes: &Vec<u8>, plain: &str) -> Result<Vec<u8>, String> {
-    let terminated_plain : String = String::from(plain) + "\n";
+    let terminated_plain : String = String::from(plain) + EOF;
     let cipher_bits = bitify_message(terminated_plain.as_str());
     let items = img_data_bytes.iter()
         .zip_longest(cipher_bits)
@@ -43,7 +44,7 @@ pub fn decrypt(img_data_bytes: &Vec<u8>) -> Result<String, FromUtf8Error> {
         .chunks(8)
         .into_iter()
         .map(|bits| unbitify_message(bits.collect_vec()))
-        .take_while(|byte| byte.as_ref().ok() != Some(&String::from("\n")))
+        .take_while(|byte| byte.as_ref().ok() != Some(&String::from(EOF)))
         .collect()
 }
 
@@ -106,9 +107,7 @@ mod tests {
         let img = generate_image(msg.len());
 
         let res = encrypt(&img, msg).unwrap();
-
-        let msg_terminated = (String::from(msg) + "\n").as_str();
-        let expected = bitify_message(msg_terminated);
+        let expected = bitify_message((String::from(msg) + EOF).as_str());
 
         assert_eq!(expected.len(), res.len());
         // Assert the LSB is the same as the cipher's
@@ -116,7 +115,6 @@ mod tests {
             assert_eq!(bit as u8, byte % 2);
         }
 
-        // Assert the rest of the bits are left as the original's
         for (&res, original) in res.iter().zip(img) {
             for bit_idx in 1..8 {
                 assert_eq!(get_bit_at(original, bit_idx), get_bit_at(res, bit_idx))

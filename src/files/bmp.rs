@@ -5,8 +5,9 @@ use std::fs::File;
 use std::io::{Read, Write};
 use rand::Rng;
 
-use crate::bits::{bitify_message, set_bit_at};
+use crate::bits::{bitify_message, set_bit_at, unbitify_message};
 use self::itertools::{Itertools, EitherOrBoth};
+use std::string::FromUtf8Error;
 
 
 pub fn read(path: &str) -> Result<Vec<u8>, std::io::Error> {
@@ -35,8 +36,15 @@ pub fn encrypt(img_data_bytes: &Vec<u8>, plain: &str) -> Result<Vec<u8>, String>
     items
 }
 
-pub fn decrypt(img_data_bytes: &Vec<u8>) -> Result<String, ()> {
-    unimplemented!()
+pub fn decrypt(img_data_bytes: &Vec<u8>) -> Result<String, FromUtf8Error> {
+    // TODO - stopping condition
+    // TODO - lazy eval
+    img_data_bytes.iter()
+        .map(|&byte| { byte % 2 == 1 })
+        .chunks(8)
+        .into_iter()
+        .map(|bits| unbitify_message(bits.collect_vec()))
+        .collect()
 }
 
 #[cfg(test)]

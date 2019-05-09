@@ -1,11 +1,13 @@
 #![feature(trait_alias)]
 extern crate num;
+extern crate itertools;
 
 use core::mem;
 use num::NumCast;
 use self::num::PrimInt;
-use std::str::Utf8Error;
 use std::string::FromUtf8Error;
+use itertools::Itertools;
+
 
 /// ```
 /// let result = stegno::bits::bitify_message("A");
@@ -43,20 +45,15 @@ pub fn bitify_message(cipher: &str) -> Vec<bool> {
 /// assert_eq!("Avshyz", stegno::bits::unbitify_message(bitified).unwrap());
 /// ```
 pub fn unbitify_message(bits: Vec<bool>) -> Result<String, FromUtf8Error> {
-    let mut res: Vec<u8> = vec![];
-    let mut curr = 0;
-
-    for (idx, &bit) in bits.iter().enumerate() {
-        let x = (idx % 8) as u8;
-        if idx % 8 != 0 || idx == 0 {
-            curr = set_bit_at(curr, (7 - (idx % 8)) as u32, bit).unwrap();
-        } else {
-            res.push(curr);
-            curr = 0
-        }
-    }
-    res.push(curr);
-    String::from_utf8(res)
+    String::from_utf8(
+        bits.iter()
+            .chunks(8)
+            .into_iter()
+            .map(|split_byte| {
+                split_byte.fold(0, |res, &bit| (res << 1) | (bit as u8))
+            })
+            .collect()
+    )
 }
 
 /// ```

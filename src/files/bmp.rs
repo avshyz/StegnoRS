@@ -79,13 +79,13 @@ mod tests {
     #[test]
     fn test_read_and_write() -> Result<(), std::io::Error> {
         let e2e_test_file = "E2E.bin";
-        remove_file(e2e_test_file);
 
         let data: Vec<u8> = vec![1, 2, 3];
         write(e2e_test_file, &data);
         let read_data = read(e2e_test_file)?;
 
         assert_eq!(read_data, data);
+        remove_file(e2e_test_file);
         Ok(())
     }
 

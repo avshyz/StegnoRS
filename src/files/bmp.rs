@@ -54,14 +54,16 @@ mod tests {
     use std::fs::{copy, remove_file};
     use crate::bits::get_bit_at;
 
-    static TEST_FILE_PATH: &str = "res/test.bmp";
+    static TEST_INPUT_FILE_PATH: &str = "res/test.bmp";
+    static TEST_OUTPUT_FILE_PATH: &str = "res/ciphered.bmp";
 
     fn setup() {
-        copy("res/BMP_FILE.bmp", TEST_FILE_PATH);
+        copy("res/BMP_FILE.bmp", TEST_INPUT_FILE_PATH);
     }
 
     fn teardown() {
-        remove_file(TEST_FILE_PATH);
+        remove_file(TEST_INPUT_FILE_PATH);
+        remove_file(TEST_OUTPUT_FILE_PATH);
     }
 
     #[test]
@@ -137,6 +139,24 @@ mod tests {
         let img = generate_image(msg.len() - 1);
         let encrypted = encrypt(&img, msg);
         assert!(encrypted.is_err())
+    }
+
+    #[test]
+    pub fn test_e2e() -> Result<(), String> {
+        let msg = "What is a sound of one hand clapping?";
+
+        setup();
+        // Encrypting
+        let file_data = read(TEST_INPUT_FILE_PATH).unwrap();
+        let encrypted = encrypt(&file_data, msg).unwrap();
+        write(TEST_OUTPUT_FILE_PATH, &encrypted).unwrap();
+
+        // Decrypting
+        let file_data = read(TEST_OUTPUT_FILE_PATH).unwrap();
+        let decrypted= decrypt(&file_data).unwrap();
+        assert_eq!(msg, decrypted);
+        teardown();
+        Ok(())
     }
 
     fn generate_image(length: usize) -> Vec<u8> {

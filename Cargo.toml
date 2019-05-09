@@ -7,4 +7,5 @@ edition = "2018"
 [dependencies]
 num = "*"
 rand = "*"
+itertools = "*"
 simple-error = "0.1.13"

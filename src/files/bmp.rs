@@ -1,11 +1,12 @@
 extern crate rand;
+extern crate itertools;
 
 use std::fs::File;
 use std::io::{Read, Write};
-use std::fmt::Error;
 use rand::Rng;
 
 use crate::bits::{bitify_message, set_bit_at};
+use self::itertools::{Itertools, EitherOrBoth};
 
 
 pub fn read(path: &str) -> Result<Vec<u8>, std::io::Error> {
@@ -23,29 +24,26 @@ pub fn write(path: &str, data: &Vec<u8>) -> Result<(), std::io::Error> {
 
 pub fn encrypt(img_data_bytes: &Vec<u8>, plain: &str) -> Result<Vec<u8>, String> {
     let cipher_bits = bitify_message(plain);
-    // res will be a vector containing a modified file data, which means it'll of the file's same size
-    let mut res: Vec<u8> = Vec::with_capacity(img_data_bytes.len() * 8);
+    let items = img_data_bytes.iter()
+        .zip_longest(cipher_bits)
+        .map(|x| match x {
+            EitherOrBoth::Both(&img_byte, cipher_bit) => set_bit_at(img_byte, 0, cipher_bit),
+            EitherOrBoth::Left(&img_byte) => Ok(img_byte),
+            EitherOrBoth::Right(_) => Err(String::from("File too small for given message"))
+        })
+        .collect();
+    items
+}
 
-    // -1 because of the eof, which is another byte to the cipher
-    if cipher_bits.len() > (img_data_bytes.len() - 1) * 8 {
-        Err(String::from("File too small for given message"))
-    } else {
-        for (idx, &datum) in img_data_bytes.iter().enumerate() {
-            if idx < cipher_bits.len() {
-                let x = set_bit_at(datum, 0, cipher_bits[idx])?;
-                res.push(x);
-            } else {
-                res.push(datum);
-            }
-        }
-        Ok(res)
-    }
+pub fn decrypt(img_data_bytes: &Vec<u8>) -> Result<String, ()> {
+    unimplemented!()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::fs::{copy, remove_file};
+    use crate::bits::get_bit_at;
 
     static TEST_FILE_PATH: &str = "res/test.bmp";
 
@@ -93,17 +91,44 @@ mod tests {
     #[test]
     fn test_enrypt_over_data() {
         let msg = "Sanguine, my brother. Sanguine.";
-        let img_size = msg.len() * 8;
 
-        let mut rng = rand::thread_rng();
-        let img: Vec<u8> = (0..img_size).map(|_| rng.gen()).collect();
+        let img = generate_image(msg.len() * 8);
 
         let res = encrypt(&img, msg).unwrap();
         let bitified = bitify_message(msg);
 
         assert_eq!(bitified.len(), res.len());
         for (&byte, bit) in res.iter().zip(bitified) {
-            assert_eq!(bit as u8, byte % 2)
+            assert_eq!(bit as u8, byte % 2);
         }
+
+        for (&res, original) in res.iter().zip(img) {
+            for bit_idx in 1..8 {
+                assert_eq!(get_bit_at(original, bit_idx), get_bit_at(res, bit_idx))
+            }
+        }
+    }
+
+    #[test]
+    pub fn test_encrypt_and_decrypt_e2e() {
+        let msg = "He's dead, Jim...";
+        let img = generate_image(msg.len() * 8);
+        let encrypted = encrypt(&img, msg).unwrap();
+        let decrypted = decrypt(&encrypted).unwrap();
+        assert_eq!(msg, decrypted);
+    }
+
+    #[test]
+    pub fn test_encrypt_to_tiny_image() {
+        let msg = "What do we say to the god of death?";
+        let img = generate_image(msg.len() * 8 - 1);
+        let encrypted = encrypt(&img, msg);
+        assert!(encrypted.is_err())
+    }
+
+    fn generate_image(length: usize) -> Vec<u8> {
+        let mut rng = rand::thread_rng();
+        let img: Vec<u8> = (0..length).map(|_| rng.gen()).collect();
+        img
     }
 }

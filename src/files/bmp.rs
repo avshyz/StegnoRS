@@ -6,7 +6,7 @@ use std::io::{Read, Write};
 use rand::Rng;
 
 use crate::bits::{bitify_message, set_bit_at, unbitify_message};
-use self::itertools::{Itertools, EitherOrBoth};
+use self::itertools::{Itertools, EitherOrBoth, Chunk, Chunks};
 use std::string::FromUtf8Error;
 
 
@@ -24,7 +24,8 @@ pub fn write(path: &str, data: &Vec<u8>) -> Result<(), std::io::Error> {
 }
 
 pub fn encrypt(img_data_bytes: &Vec<u8>, plain: &str) -> Result<Vec<u8>, String> {
-    let cipher_bits = bitify_message(plain);
+    let terminated_plain : String = String::from(plain) + "\n";
+    let cipher_bits = bitify_message(terminated_plain.as_str());
     let items = img_data_bytes.iter()
         .zip_longest(cipher_bits)
         .map(|x| match x {
@@ -88,27 +89,34 @@ mod tests {
     #[test]
     fn test_encrypt_over_zeros() {
         let msg = "What is the color of the night?";
-        let res = encrypt(&vec![0; msg.len() * 8], msg).unwrap();
+        // Add more byte, for the EOF
+        let res = encrypt(&vec![0; (msg.len() + 1) * 8], msg).unwrap();
 
         let expected: Vec<u8> = bitify_message(msg).iter().map(|&bit| bit as u8).collect();
 
-        assert_eq!(expected, res);
+        // Message should be the same, except for the last byte
+        assert_eq!(expected.as_slice(), &res[..res.len() - 8]);
+        // Last byte should contain the EOF (0x0A)
+        assert_eq!([0, 0, 0, 0, 1, 0, 1, 0], &res[res.len() - 8..]);
     }
 
     #[test]
     fn test_enrypt_over_data() {
         let msg = "Sanguine, my brother. Sanguine.";
-
-        let img = generate_image(msg.len() * 8);
+        let img = generate_image(msg.len());
 
         let res = encrypt(&img, msg).unwrap();
-        let bitified = bitify_message(msg);
 
-        assert_eq!(bitified.len(), res.len());
-        for (&byte, bit) in res.iter().zip(bitified) {
+        let msg_terminated = (String::from(msg) + "\n").as_str();
+        let expected = bitify_message(msg_terminated);
+
+        assert_eq!(expected.len(), res.len());
+        // Assert the LSB is the same as the cipher's
+        for (&byte, bit) in res.iter().zip(expected) {
             assert_eq!(bit as u8, byte % 2);
         }
 
+        // Assert the rest of the bits are left as the original's
         for (&res, original) in res.iter().zip(img) {
             for bit_idx in 1..8 {
                 assert_eq!(get_bit_at(original, bit_idx), get_bit_at(res, bit_idx))
@@ -117,9 +125,9 @@ mod tests {
     }
 
     #[test]
-    pub fn test_encrypt_and_decrypt_e2e() {
+    pub fn test_encrypt_and_decrypt() {
         let msg = "He's dead, Jim...";
-        let img = generate_image(msg.len() * 8);
+        let img = generate_image(msg.len() + 10);
         let encrypted = encrypt(&img, msg).unwrap();
         let decrypted = decrypt(&encrypted).unwrap();
         assert_eq!(msg, decrypted);
@@ -128,14 +136,14 @@ mod tests {
     #[test]
     pub fn test_encrypt_to_tiny_image() {
         let msg = "What do we say to the god of death?";
-        let img = generate_image(msg.len() * 8 - 1);
+        let img = generate_image(msg.len() - 1);
         let encrypted = encrypt(&img, msg);
         assert!(encrypted.is_err())
     }
 
     fn generate_image(length: usize) -> Vec<u8> {
         let mut rng = rand::thread_rng();
-        let img: Vec<u8> = (0..length).map(|_| rng.gen()).collect();
+        let img: Vec<u8> = (0..(length + 1) * 8).map(|_| rng.gen()).collect();
         img
     }
 }

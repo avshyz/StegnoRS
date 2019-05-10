@@ -9,9 +9,13 @@ use std::string::FromUtf8Error;
 use itertools::Itertools;
 
 
-pub fn bitify_message(cipher: &str) -> Vec<bool> {
+pub fn bitify_str(cipher: &str) -> Vec<bool> {
+    bitify_data(cipher.as_bytes())
+}
+
+pub fn bitify_data(cipher: &[u8]) -> Vec<bool> {
     let mut res = vec![];
-    for char in cipher.as_bytes() {
+    for char in cipher {
         let curr: Vec<bool> = (0..mem::size_of_val(&char))
             .rev()
             .map(|i| get_bit_at(*char, i as u32).unwrap())
@@ -21,16 +25,19 @@ pub fn bitify_message(cipher: &str) -> Vec<bool> {
     res
 }
 
-pub fn unbitify_message(bits: Vec<bool>) -> Result<String, FromUtf8Error> {
-    String::from_utf8(
-        bits.iter()
-            .chunks(8)
-            .into_iter()
-            .map(|split_byte| {
-                split_byte.fold(0, |res, &bit| (res << 1) | (bit as u8))
-            })
-            .collect()
-    )
+
+pub fn unbitify_str(bits: Vec<bool>) -> Result<String, FromUtf8Error> {
+    String::from_utf8(unbitify_data(bits))
+}
+
+pub fn unbitify_data(bits: Vec<bool>) -> Vec<u8> {
+    bits.iter()
+        .chunks(8)
+        .into_iter()
+        .map(|split_byte| {
+            split_byte.fold(0, |res, &bit| (res << 1) | (bit as u8))
+        })
+        .collect()
 }
 
 pub fn get_bit_at<T: PrimInt>(input: T, n: u32) -> Result<bool, String> {
@@ -79,22 +86,22 @@ mod tests {
 
     #[test]
     pub fn test_unbitify_message() {
-        assert_eq!("A", unbitify_message(vec![false, true, false, false, false, false, false, true]).unwrap());
+        assert_eq!("A", unbitify_str(vec![false, true, false, false, false, false, false, true]).unwrap());
         let bitified = vec![false, true, false, false, false, false, false, true,
                             false, true, true, true, false, true, true, false,
                             false, true, true, true, false, false, true, true,
                             false, true, true, false, true, false, false, false,
                             false, true, true, true, true, false, false, true,
                             false, true, true, true, true, false, true, false];
-        assert_eq!("Avshyz", unbitify_message(bitified).unwrap());
+        assert_eq!("Avshyz", unbitify_str(bitified).unwrap());
     }
 
     #[test]
     pub fn test_bitify_message() {
-        let result = bitify_message("A");
+        let result = bitify_str("A");
         assert_eq!(vec![false, true, false, false, false, false, false, true], result);
 
-        let result = bitify_message("Avshyz");
+        let result = bitify_str("Avshyz");
         assert_eq!(vec![false, true, false, false, false, false, false, true,
                         false, true, true, true, false, true, true, false,
                         false, true, true, true, false, false, true, true,

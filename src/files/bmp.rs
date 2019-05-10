@@ -5,7 +5,7 @@ use std::fs::File;
 use std::io::{Read, Write};
 use rand::Rng;
 
-use crate::bits::{bitify_message, set_bit_at, unbitify_message};
+use crate::bits::{bitify_str, set_bit_at, unbitify_str};
 use self::itertools::{Itertools, EitherOrBoth, Chunk, Chunks};
 use std::string::FromUtf8Error;
 
@@ -26,7 +26,7 @@ pub fn write(path: &str, data: &Vec<u8>) -> Result<(), std::io::Error> {
 
 pub fn encrypt(img_data_bytes: &Vec<u8>, plain: &str) -> Result<Vec<u8>, String> {
     let terminated_plain : String = String::from(plain) + EOF;
-    let cipher_bits = bitify_message(terminated_plain.as_str());
+    let cipher_bits = bitify_str(terminated_plain.as_str());
     let items = img_data_bytes.iter()
         .zip_longest(cipher_bits)
         .map(|x| match x {
@@ -43,7 +43,7 @@ pub fn decrypt(img_data_bytes: &Vec<u8>) -> Result<String, FromUtf8Error> {
         .map(|&byte| byte % 2 == 1)
         .chunks(8)
         .into_iter()
-        .map(|bits| unbitify_message(bits.collect_vec()))
+        .map(|bits| unbitify_str(bits.collect_vec()))
         .take_while(|byte| byte.as_ref().ok() != Some(&String::from(EOF)))
         .collect()
 }
@@ -95,7 +95,7 @@ mod tests {
         // Add more byte, for the EOF
         let res = encrypt(&vec![0; (msg.len() + 1) * 8], msg).unwrap();
 
-        let expected: Vec<u8> = bitify_message(msg).iter().map(|&bit| bit as u8).collect();
+        let expected: Vec<u8> = bitify_str(msg).iter().map(|&bit| bit as u8).collect();
 
         // Message should be the same, except for the last byte
         assert_eq!(expected.as_slice(), &res[..res.len() - 8]);
@@ -109,7 +109,7 @@ mod tests {
         let img = generate_image(msg.len());
 
         let res = encrypt(&img, msg).unwrap();
-        let expected = bitify_message((String::from(msg) + EOF).as_str());
+        let expected = bitify_str((String::from(msg) + EOF).as_str());
 
         assert_eq!(expected.len(), res.len());
         // Assert the LSB is the same as the cipher's

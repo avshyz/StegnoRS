@@ -24,22 +24,23 @@ pub fn write(path: &str, data: &Vec<u8>) -> Result<(), std::io::Error> {
     Ok(())
 }
 
-pub fn encrypt(img_data_bytes: &Vec<u8>, plain: &str) -> Result<Vec<u8>, String> {
+// TODO - think about changing to non-str variant (to support data encoding), and add the conversion outside
+pub fn inject(carrier: &Vec<u8>, plain: &str) -> Result<Vec<u8>, String> {
     let terminated_plain : String = String::from(plain) + EOF;
-    let cipher_bits = bitify_str(terminated_plain.as_str());
-    let items = img_data_bytes.iter()
-        .zip_longest(cipher_bits)
+    let injected_bits = bitify_str(terminated_plain.as_str());
+    let items = carrier.iter()
+        .zip_longest(injected_bits)
         .map(|x| match x {
-            EitherOrBoth::Both(&img_byte, cipher_bit) => set_bit_at(img_byte, 0, cipher_bit),
-            EitherOrBoth::Left(&img_byte) => Ok(img_byte),
+            EitherOrBoth::Both(&carrier_byte, injected_bit) => set_bit_at(carrier_byte, 0, injected_bit),
+            EitherOrBoth::Left(&carrier_byte) => Ok(carrier_byte),
             EitherOrBoth::Right(_) => Err(String::from("File too small for given message"))
         })
         .collect();
     items
 }
 
-pub fn decrypt(img_data_bytes: &Vec<u8>) -> Result<String, FromUtf8Error> {
-    img_data_bytes.iter()
+pub fn extract(carrier: &Vec<u8>) -> Result<String, FromUtf8Error> {
+    carrier.iter()
         .map(|&byte| byte % 2 == 1)
         .chunks(8)
         .into_iter()
@@ -81,34 +82,38 @@ mod tests {
         let e2e_test_file = "E2E.bin";
 
         let data: Vec<u8> = vec![1, 2, 3];
-        write(e2e_test_file, &data);
+
+        write(e2e_test_file, &data).unwrap();
         let read_data = read(e2e_test_file)?;
 
         assert_eq!(read_data, data);
-        remove_file(e2e_test_file);
+
+        remove_file(e2e_test_file).unwrap();
         Ok(())
     }
 
     #[test]
-    fn test_encrypt_over_zeros() {
+    fn test_inject_over_zeros() {
         let msg = "What is the color of the night?";
         // Add more byte, for the EOF
-        let res = encrypt(&vec![0; (msg.len() + 1) * 8], msg).unwrap();
+        let res = inject(&vec![0; (msg.len() + 1) * 8], msg).unwrap();
 
-        let expected: Vec<u8> = bitify_str(msg).iter().map(|&bit| bit as u8).collect();
-
-        // Message should be the same, except for the last byte
-        assert_eq!(expected.as_slice(), &res[..res.len() - 8]);
-        // Last byte should contain the EOF (0x0A)
-        assert_eq!([0, 0, 0, 0, 1, 0, 1, 0], &res[res.len() - 8..]);
+        let expected: Vec<u8> = bitify_str(msg)
+            .iter()
+            // Adding the eof
+            .chain(bitify_str(EOF).iter())
+            // Converting to the format appropriate by encryption
+            .map(|&bit| bit as u8)
+            .collect();
+        assert_eq!(expected, res);
     }
 
     #[test]
     fn test_enrypt_over_data() {
         let msg = "Sanguine, my brother. Sanguine.";
-        let img = generate_image(msg.len());
+        let carrier = generate_image(msg.len());
 
-        let res = encrypt(&img, msg).unwrap();
+        let res = inject(&carrier, msg).unwrap();
         let expected = bitify_str((String::from(msg) + EOF).as_str());
 
         assert_eq!(expected.len(), res.len());
@@ -117,9 +122,12 @@ mod tests {
             assert_eq!(bit as u8, byte % 2);
         }
 
-        for (&res, original) in res.iter().zip(img) {
+        for (&res, original) in res.iter().zip(carrier) {
             for bit_idx in 1..8 {
-                assert_eq!(get_bit_at(original, bit_idx), get_bit_at(res, bit_idx))
+                assert_eq!(
+                    get_bit_at(original, bit_idx),
+                    get_bit_at(res, bit_idx)
+                )
             }
         }
     }
@@ -128,17 +136,17 @@ mod tests {
     pub fn test_encrypt_and_decrypt() {
         let msg = "He's dead, Jim...";
         let img = generate_image(msg.len() + 10);
-        let encrypted = encrypt(&img, msg).unwrap();
-        let decrypted = decrypt(&encrypted).unwrap();
-        assert_eq!(msg, decrypted);
+        let injected = inject(&img, msg).unwrap();
+        let extracted = extract(&injected).unwrap();
+        assert_eq!(msg, extracted);
     }
 
     #[test]
     pub fn test_encrypt_to_tiny_image() {
         let msg = "What do we say to the god of death?";
         let img = generate_image(msg.len() - 1);
-        let encrypted = encrypt(&img, msg);
-        assert!(encrypted.is_err())
+        let injected = inject(&img, msg);
+        assert!(injected.is_err())
     }
 
     #[test]
@@ -148,13 +156,13 @@ mod tests {
         setup();
         // Encrypting
         let file_data = read(TEST_INPUT_FILE_PATH).unwrap();
-        let encrypted = encrypt(&file_data, msg).unwrap();
-        write(TEST_OUTPUT_FILE_PATH, &encrypted).unwrap();
+        let injected = inject(&file_data, msg).unwrap();
+        write(TEST_OUTPUT_FILE_PATH, &injected).unwrap();
 
         // Decrypting
         let file_data = read(TEST_OUTPUT_FILE_PATH).unwrap();
-        let decrypted= decrypt(&file_data).unwrap();
-        assert_eq!(msg, decrypted);
+        let extracted= extract(&file_data).unwrap();
+        assert_eq!(msg, extracted);
         teardown();
         Ok(())
     }

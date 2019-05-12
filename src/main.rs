@@ -30,8 +30,7 @@ fn main() {
         Some("read") => {
             let matches = matches.subcommand_matches("read").unwrap();
             let input_path = matches.value_of("input").unwrap();
-            // TODO - add error handling
-            // TODO - maybe encapsulate better
+
             let file_data = files::bmp::read(input_path).unwrap();
             let extracted = files::bmp::extract(&file_data).unwrap();
             println!("{}", extracted);

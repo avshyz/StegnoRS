@@ -34,9 +34,7 @@ pub fn unbitify_data(bits: Vec<bool>) -> Vec<u8> {
     bits.iter()
         .chunks(8)
         .into_iter()
-        .map(|split_byte| {
-            split_byte.fold(0, |res, &bit| (res << 1) | (bit as u8))
-        })
+        .map(|split_byte| split_byte.fold(0, |res, &bit| (res << 1) | (bit as u8)))
         .collect()
 }
 

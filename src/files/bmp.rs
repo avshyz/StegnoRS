@@ -161,7 +161,7 @@ mod tests {
 
         // Decrypting
         let file_data = read(TEST_OUTPUT_FILE_PATH).unwrap();
-        let extracted= extract(&file_data).unwrap();
+        let extracted = extract(&file_data).unwrap();
         assert_eq!(msg, extracted);
         teardown();
         Ok(())
@@ -169,7 +169,7 @@ mod tests {
 
     fn generate_image(length: usize) -> Vec<u8> {
         let mut rng = rand::thread_rng();
-        let img: Vec<u8> = (0..(length + 1) * 8).map(|_| rng.gen()).collect();
+        let img: Vec<u8> = (0..(length + EOF.len()) * 8).map(|_| rng.gen()).collect();
         img
     }
 }

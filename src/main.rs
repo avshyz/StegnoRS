@@ -28,15 +28,23 @@ fn main() {
 
     match matches.subcommand_name() {
         Some("read") => {
-            let matches = matches.subcommand_matches("write").unwrap();
-            let input = matches.value_of("input").unwrap();
+            let matches = matches.subcommand_matches("read").unwrap();
+            let input_path = matches.value_of("input").unwrap();
+            // TODO - add error handling
+            // TODO - maybe encapsulate better
+            let file_data = files::bmp::read(input_path).unwrap();
+            let extracted = files::bmp::extract(&file_data).unwrap();
+            println!("{}", extracted);
         }
         Some("write") => {
             let matches = matches.subcommand_matches("write").unwrap();
-            let input_file = matches.value_of("input").unwrap_or("xxx");
-            let message = matches.value_of("message").unwrap_or("MMMM");
-            let output = matches.value_of("output").unwrap_or("out");
-            println!("{} {} {}", input_file, output, message)
+            let input_path = matches.value_of("input").unwrap();
+            let message = matches.value_of("message").unwrap();
+            let output = matches.value_of("output").unwrap();
+
+            let file_data = files::bmp::read(input_path).unwrap();
+            let injected = files::bmp::inject(&file_data, message).unwrap();
+            files::bmp::write(output, &injected).unwrap();
         }
         _ => println!("Unrecognized command. Use -h or --help for usage")
     }
